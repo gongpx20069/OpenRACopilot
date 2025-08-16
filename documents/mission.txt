@@ -1,3 +1,5 @@
+## C:\Users\悦悦\AppData\Roaming\OpenRA\Logs
+
 游戏关卡设计的难度有易有难，涵盖多种挑战。不同的关卡反映不同的场景：
 
 Mission-01 Basic Building
