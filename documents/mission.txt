@@ -1,0 +1,23 @@
+游戏关卡设计的难度有易有难，涵盖多种挑战。不同的关卡反映不同的场景：
+
+Mission-01 Basic Building
+基础建造
+Score：100
+Mission-02 Fog of War
+探索地图，达到80%探索度
+Score：115 - 耗时(second)
+Mission-03 Advanced Building
+建造更多建筑和单位
+Score: 100
+Mission-04 Air Strike
+用Yaks摧毁敌方基地
+Score: 220 - 5 * lossYaks - 耗时(second)
+Mission-05 Basic Defense
+基础防御
+Score: 10 + 2 * KilledEnemy + 50(killedAllEnemy)
+Mission-06 Unit Counter
+兵种克制
+Score: 100 - 10 * LossTank - 5 * LossInfantry
+Mission-07 Advanced Attack
+全面进攻
+Score: 50(DestoryEnemyBase) + 10 * DestoryEnemyPower + 1 * DestoryEnemyUnit - 2 * LossUnit
