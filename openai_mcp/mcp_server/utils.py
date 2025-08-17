@@ -46,3 +46,9 @@ def classify_different_faction_actors(actors: List[Actor], factions = ["己方",
         if actor.faction in factions and actor.type != "mpspawn":
             output[actor.faction][actor.type].append(actor)
     return output
+
+
+def convert_byte_to_str(byte_data:memoryview) -> str:
+    byte_data = bytes(byte_data)
+    # Decode the bytes back to a string (using UTF-8)
+    return byte_data.decode('utf-8').rstrip('\x00')

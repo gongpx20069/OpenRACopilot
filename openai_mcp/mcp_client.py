@@ -7,7 +7,8 @@ from agents import (
     set_default_openai_client, 
     set_default_openai_api, 
     enable_verbose_stdout_logging, 
-    trace, 
+    trace,
+    set_tracing_disabled,
     TResponseInputItem, 
     ItemHelpers,
     )
@@ -20,6 +21,7 @@ from .agent.agent_factory import ExecutorFeedback, AttackRetreatFeecback
 
 
 # enable_verbose_stdout_logging()
+set_tracing_disabled(True)
 set_default_openai_api("chat_completions")
 set_default_openai_client(
     AsyncAzureOpenAI(

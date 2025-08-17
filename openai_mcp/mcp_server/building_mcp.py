@@ -2,11 +2,16 @@ from typing import List
 from mcp.server.fastmcp import FastMCP
 from pydantic import  Field
 from OpenRA_Copilot_Library.game_api import GameAPIError
-from OpenRA_Copilot_Library.models import Actor, TargetsQueryParam
-from .utils import classify_different_faction_actors, validate_actor_ids, print_tool_io
+from OpenRA_Copilot_Library.models import TargetsQueryParam
+from .utils import classify_different_faction_actors, convert_byte_to_str, validate_actor_ids, print_tool_io
 from . import BUILDING, VEHICLE, INFANTRIES, AIR, game_api, UNIT_DEPENDENCIES, BUILDING_DEPENDENCIES
 from collections import defaultdict
 import traceback
+from multiprocessing import shared_memory
+import configs
+
+# shared memory
+shm = None # shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME)
 
 # init game api
 build_mcp = FastMCP(name="RedAlert Game Server - Building, Producing and Basic Info Part", port=8001)
@@ -115,7 +120,7 @@ def repair_units(
 #     return f"[ERROR] 建造{building_name}失败。"
 
 
-@build_mcp.tool(name="query_game_state", description="查询游戏状态（所有自己的单位，地图信息，玩家基地信息，查询屏幕信息）")
+@build_mcp.tool(name="query_game_state", description="查询游戏状态（敌我双方单位信息，已探查的地图信息，玩家基地信息，查询屏幕信息）")
 @print_tool_io
 def query_game_state() -> str:
     result = ""
@@ -164,12 +169,40 @@ def query_game_state() -> str:
         result += "\n"
         
         # 查询地图信息
-        result += "# 地图信息\n"
         map_info = game_api.map_query()
+
+        result += "# 地图信息\n"
         result += f"- 宽度{map_info.MapWidth}\n"
         result += f"- 高度{map_info.MapHeight}\n"
         result += f"- 地形类型{map_info.Terrain[0][0] if map_info.Terrain else '未知'}\n"
+        result += "**NOTE:地图原点(0, 0)表示地图的左上角。**\n"
+
         result += "\n"
+
+        # try:
+        #     GLOBAL_MAP.update_map_cache(map_query_result=map_info, actors=actors)
+        #     llm_map_info = GLOBAL_MAP.to_llm()
+        #     result += "## 地图轮廓"
+        #     result += "```\n"
+        #     result += llm_map_info + "\n"
+        #     result += "```\n"
+        #     result += "> NOTE: 该地图是一个微缩预测地图，具有滞后性，其中0表示未知区域，非0表示已探索比例。\n\n"
+        # except:
+        #     pass
+
+        try:
+            global shm
+            if shm is None:
+                shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME)
+            llm_map_info = convert_byte_to_str(shm.buf)
+            result += "## 地图轮廓"
+            result += "```\n"
+            result += llm_map_info + "\n"
+            result += "```\n"
+            result += "> NOTE: 该地图是一个微缩预测地图，具有滞后性，其中0表示未知区域，非0表示已探索比例。\n\n"
+        except Exception as ex:
+            print(f"[ERROR] 查询地图信息失败: {ex}")
+            traceback.print_exc()
 
         # 查询玩家基地信息
         result += "# 玩家基地信息\n"

@@ -13,7 +13,7 @@ actor_mcp = FastMCP(name="RedAlert Game Server - Moving and Attacking Part", por
 
 
 @actor_mcp.tool(name="move_units_by_location", description="开始移动单位（载具，士兵，空军，海军）到指定位置。")
-@tool_sleep(1)
+@tool_sleep(0.6)
 @print_tool_io
 def move_units_by_location(
     actor_ids: List[int] = Field(..., description="计划移动的单位ID列表"),
@@ -35,18 +35,36 @@ def move_units_by_location(
         return "[ERROR] 移动出现问题，请确定ActorList中的ID是有效的己方有效（载具，士兵，空军，海军）ID。"
 
 
-# @actor_mcp.tool(name="form_group", description="将单位（载具，士兵，空军，海军）编成具体的组。")
-# @print_tool_io
-# def form_group(
-#     actor_ids: List[int] = Field(..., description="计划组织的单位ID列表"),
-#     group_id: int = Field(..., description="计划编队后的ID")
-# ):
-#     try:
-#         validated_actors = validate_actor_ids(actor_ids)
-#         game_api.form_group(validated_actors, group_id)
-#         return f"[SUCCESS] 正在将Actor [{validated_actors}] 组织成组{group_id}"
-#     except:
-#         return "[ERROR] 无法编队，请确定ActorList中的ID是有效的己方有效（载具，士兵，空军，海军）ID。"
+@actor_mcp.tool(name="form_group", description="将单位（载具，士兵，空军，海军）编成具体的组。")
+@print_tool_io
+def form_group(
+    actor_ids: List[int] = Field(..., description="计划组织的单位ID列表"),
+    group_id: int = Field(..., description="计划编队后的ID")
+):
+    try:
+        validated_actors = validate_actor_ids(actor_ids)
+        game_api.form_group(validated_actors, group_id)
+        return f"[SUCCESS] 正在将Actor [{validated_actors}] 组织成组{group_id}"
+    except:
+        return "[ERROR] 无法编队，请确定ActorList中的ID是有效的己方有效（载具，士兵，空军，海军）ID。"
+    
+
+@actor_mcp.tool(name="query_group", description="查询某个具体的编队有哪些具体单位（载具，士兵，空军，海军）。")
+@print_tool_io
+def query_group(
+    group_id: int = Field(..., description="想要查询的我方军事单位编组ID")
+):
+    try:
+        result = f"# 编组{group_id}\n"
+        group = game_api.query_actor(query_params=TargetsQueryParam(group_id=[group_id]))
+        for actor in group:
+            result += f"- ID：{actor.actor_id}，类型：{actor.type}，位置：{actor.position}，HP：{actor.hppercent}%\n"
+        result += f"...编组{group_id}共{len(group)}个单位。\n"
+        return result
+    except Exception as ex:
+        print(ex)
+        traceback.print_exc()
+        return f"[ERROR] 无法查询编组，请确定编组ID是有效的"
     
 
 @actor_mcp.tool(name="stop_move", description="停止单位（载具，士兵，空军，海军）的移动。")
@@ -56,7 +74,7 @@ def stop_move(
 ):
     try:
         validated_actors = validate_actor_ids(actor_ids)
-        game_api.stop_move(validated_actors)
+        game_api.stop(validated_actors)
         return f"[SUCCESS] 正在停止Actor [{validated_actors}] 的移动"
     except:
         return "[ERROR] 无法停止移动，请确定ActorList中的ID是有效的己方有效（载具，士兵，空军，海军）ID。"

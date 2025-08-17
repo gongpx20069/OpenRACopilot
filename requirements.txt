@@ -2,3 +2,4 @@ mcp[cli]
 openai_agents
 openai
 azure-cognitiveservices-speech
+numpy
