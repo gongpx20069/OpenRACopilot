@@ -7,8 +7,9 @@ from .utils import classify_different_faction_actors, convert_byte_to_str, valid
 from . import BUILDING, VEHICLE, INFANTRIES, AIR, game_api, UNIT_DEPENDENCIES, BUILDING_DEPENDENCIES
 from collections import defaultdict
 import traceback
-from multiprocessing import shared_memory
-import configs
+# from multiprocessing import shared_memory
+# import configs
+
 
 # shared memory
 shm = None # shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME)
@@ -190,19 +191,19 @@ def query_game_state() -> str:
         # except:
         #     pass
 
-        try:
-            global shm
-            if shm is None:
-                shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME)
-            llm_map_info = convert_byte_to_str(shm.buf)
-            result += "## 地图轮廓"
-            result += "```\n"
-            result += llm_map_info + "\n"
-            result += "```\n"
-            result += "> NOTE: 该地图是一个微缩预测地图，具有滞后性，其中0表示未知区域，非0表示已探索比例。\n\n"
-        except Exception as ex:
-            print(f"[ERROR] 查询地图信息失败: {ex}")
-            traceback.print_exc()
+        # try:
+        #     global shm
+        #     if shm is None:
+        #         shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME)
+        #     llm_map_info = convert_byte_to_str(shm.buf)
+        #     result += "## 地图轮廓"
+        #     result += "```\n"
+        #     result += llm_map_info + "\n"
+        #     result += "```\n"
+        #     result += "> NOTE: 该地图是一个微缩预测地图，具有滞后性，其中0表示未知区域，非0表示已探索比例。\n\n"
+        # except Exception as ex:
+        #     print(f"[ERROR] 查询地图信息失败: {ex}")
+        #     traceback.print_exc()
 
         # 查询玩家基地信息
         result += "# 玩家基地信息\n"

@@ -5,7 +5,7 @@ from collections import defaultdict
 from ..mcp_server import BUILDING, game_api
 import traceback
 import configs
-from multiprocessing import shared_memory
+# from multiprocessing import shared_memory
 
 
 class DefenseMonitor:
@@ -40,16 +40,16 @@ class DefenseMonitor:
 
         try:
             llm_map = self.map.to_llm()
-            data_bytes = llm_map.encode('utf-8')
-            if self.shm is None:
-                try:
-                    # Attempt to create new shared memory
-                    self.shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME, create=True, size=4096)
-                except FileExistsError:
-                    # If exists, connect to existing shared memory
-                    self.shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME, create=False)
+            # data_bytes = llm_map.encode('utf-8')
+            # if self.shm is None:
+            #     try:
+            #         # Attempt to create new shared memory
+            #         self.shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME, create=True, size=4096)
+            #     except FileExistsError:
+            #         # If exists, connect to existing shared memory
+            #         self.shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME, create=False)
                 
-            self.shm.buf[:len(data_bytes)] = data_bytes
+            # self.shm.buf[:len(data_bytes)] = data_bytes
             # print(f"[INFO] Update LLM Map success, map size: {len(data_bytes)}")
 
         except Exception as ex:

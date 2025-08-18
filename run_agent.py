@@ -1,6 +1,7 @@
 from azure_speech.stt import speech_to_text_once
 import asyncio
 import configs
+from openai_mcp.agent.group_commander_agent import group_commander_tool
 from openai_mcp.mcp_client import create_executor_async, agent_chat_async
 import argparse
 from openai_mcp.agent.agent_factory import AgentFactory
@@ -8,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 import sched
 import time
 from threading import Thread
-from openai_mcp.runtime_game_state import schedule_monitor
+from openai_mcp.runtime_game_state import GROUP_COMMANDER_MONITOR, schedule_monitor
 
 
 executor = ThreadPoolExecutor(max_workers=1)
@@ -42,13 +43,19 @@ def run_scheduler_monitoring():
     print("[INFO] 地图监控已启动")
 
 
+def run_group_commander_monitor():
+    GROUP_COMMANDER_MONITOR.start()
+    print("[INFO] 组指挥监控已启动")
+
+
 async def main(enable_speech:bool = True):
     # 启动地图监控
-    run_scheduler_monitoring()
+    # run_scheduler_monitoring()
+    run_group_commander_monitor()
     async with create_executor_async(mcp_server_params=configs.MCP_CONFIGS.MCP_SERVER_PARAMS_LIST) as mcp_servers:
         # 代理实例
-        war_executor = AgentFactory.create_attack_retreat_agent(mcp_servers=mcp_servers)
-        general_executor = AgentFactory.create_executor_agent(mcp_servers=mcp_servers, handoffs=[war_executor])
+        # war_executor = AgentFactory.create_attack_retreat_agent(mcp_servers=mcp_servers)
+        general_executor = AgentFactory.create_executor_agent(mcp_servers=mcp_servers, tools=[group_commander_tool])
         while True:
             user_input = None
             if enable_speech:
@@ -62,7 +69,7 @@ async def main(enable_speech:bool = True):
                 break
 
             if user_input:
-                await agent_chat_async(general_executor, war_executor, user_input)
+                await agent_chat_async(general_executor, None, user_input)
 
 
 if __name__ == "__main__":

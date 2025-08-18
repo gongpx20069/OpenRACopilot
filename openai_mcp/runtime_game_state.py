@@ -1,9 +1,11 @@
-from .map_monitor.monitor import DefenseMonitor
-from .map_monitor.map import Map
+from .mcp_server import game_api
+from .monitor.map_monitor import DefenseMonitor
+from .monitor.map import Map
+from .monitor.group_commander_monitor import GroupMonitor
 
 GLOBAL_MAP = Map()
 DEFENSE_MONITOR = DefenseMonitor(GLOBAL_MAP)
-
+GROUP_COMMANDER_MONITOR = GroupMonitor(api=game_api, tick=1)
 
 def schedule_monitor(sc, interval: int = 3):
     """

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import List, Literal
-from agents import Agent, handoff
+from typing import Callable, List, Literal
+from agents import Agent, Handoff, handoff
 from agents.mcp import MCPServer
 from pydantic import Field
 import configs
@@ -45,7 +45,7 @@ class AgentFactory:
         )
     
     @staticmethod
-    def create_executor_agent(mcp_servers:List[MCPServer] = [], handoffs:List[Agent] = []) -> Agent:
+    def create_executor_agent(mcp_servers:List[MCPServer] = [], handoff_agents:List[Agent] = [], tools:List[Callable] = []) -> Agent:
         # --- 构造 Executer Agent 的函数 ---
         return Agent(
             model=configs.AGENTS_CONFIGS.EXECUTER_AOAI_DEPLOYMENT,
@@ -53,8 +53,10 @@ class AgentFactory:
             instructions=configs.AGENTS_CONFIGS.EXECUTER_INSTRUCTION,
             mcp_servers=mcp_servers,
             output_type=ExecutorFeedback,
-            handoffs=[handoff(agent, input_filter=handoff_message_tool_msg_filter) for agent in handoffs]
+            handoffs=[handoff(agent, input_filter=handoff_message_tool_msg_filter) for agent in handoff_agents],
+            tools=tools,
             )
+    
     
     @staticmethod
     def create_attack_retreat_agent(mcp_servers:List[MCPServer] = []) -> Agent:
@@ -62,7 +64,7 @@ class AgentFactory:
         return Agent(
             model=configs.AGENTS_CONFIGS.ATTACK_RETREAT_AOAI_DEPLOYMENT,
             name="RedAlert War Executor",
-            handoff_description="发现了敌人并且准备战斗/撤退",
+            handoff_description=configs.AGENTS_CONFIGS.ATTACK_RETREAT_HANDOFF_DESCRIPTION,
             instructions=configs.AGENTS_CONFIGS.ATTACK_RETREAT_INSTRUCTION,
             mcp_servers=mcp_servers,
             output_type=AttackRetreatFeecback,
