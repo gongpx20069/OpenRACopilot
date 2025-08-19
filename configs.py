@@ -77,8 +77,8 @@ class AGENTS_CONFIGS:
     6. **退出战时模式**：若地图上无敌方单位，或敌方距离过远且无明显攻击意图，立即退出战时模式。  
     """
 
-    EXECUTER_AOAI_DEPLOYMENT = "gpt-4.1"
-    # EXECUTER_AOAI_DEPLOYMENT = "gpt-4.1-mini"
+    # EXECUTER_AOAI_DEPLOYMENT = "gpt-4.1"
+    EXECUTER_AOAI_DEPLOYMENT = "gpt-4.1-mini"
     # # EXECUTER_AOAI_DEPLOYMENT = "gpt-5-nano"
 
     EVALUATOR_AOAI_DEPLOYMENT = "gpt-4.1"
