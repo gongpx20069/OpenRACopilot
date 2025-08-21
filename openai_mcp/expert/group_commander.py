@@ -1,17 +1,21 @@
+from collections import defaultdict
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from OpenRA_Copilot_Library import Actor, Location, TargetsQueryParam
 from OpenRA_Copilot_Library.game_api import GameAPI
 from ..mcp_server import BUILDING, VEHICLE, INFANTRIES, AIR
 
 # ================= 配置 =================
-SIGHT_RANGE = 11
+SIGHT_RANGE = 15
 ATTACK_TICK = 0.6
 MAX_TARGET_SECONDS = 1.5
+MAX_TOWER_ASSIGNMENTS = 5
+DIST_COEF = 0.15  # 距离分数系数（平方距离）
 
 # 在你的常量区新增一条：明显的非战斗/工具单位（不会主动造成伤害）
 NON_COMBAT_TYPES = {"工程师", "间谍", "采矿车", "运输卡车", "基地车"}
-DEFENSE_TOWERS = ["火焰塔", "特斯拉塔", "防空导弹"]
+DEFENSE_TOWERS = {"火焰塔", "特斯拉塔", "防空导弹"}
+COMBAT_UNITS = set(VEHICLE) | set(INFANTRIES) | set(AIR) | DEFENSE_TOWERS
 
 COUNTERED_BY = {
     # —— 步兵类 ——
@@ -100,22 +104,33 @@ COUNTERED_BY = {
 
     # —— 空军类 ——
     "运输直升机": {
-        "防空车", "雅克战机", "米格战机"
+        "防空车", "雅克战机", "米格战机", "防空导弹"
     },
     "雌鹿直升机": {
-        "防空车", "雅克战机", "米格战机"
+        "防空车", "雅克战机", "米格战机", "防空导弹"
     },
     "黑鹰直升机": {
-        "防空车", "雅克战机", "米格战机"
+        "防空车", "雅克战机", "米格战机", "防空导弹"
     },
     "雅克战机": {
-        "防空车", "米格战机"
+        "防空车", "米格战机", "防空导弹"
     },
     "长弓武装直升机": {
-        "防空车", "雅克战机", "米格战机"
+        "防空车", "雅克战机", "米格战机", "防空导弹"
     },
     "米格战机": {
-        "防空车", "雅克战机"
+        "防空车", "防空导弹"
+    },
+
+    # —— 防御建筑 ——
+    "火焰塔": {
+        "轻坦克", "重型坦克", "超重型坦克", "特斯拉坦克", "震荡坦克", "V2火箭发射车", "长弓武装直升机", "米格战机", "雅克战机"
+    },
+    "特斯拉塔": {
+        "V2火箭发射车", "长弓武装直升机", "米格战机", "超重型坦克", "震荡坦克", "长弓武装直升机", "米格战机", "雅克战机"
+    },
+    "防空导弹": {
+        "轻坦克", "重型坦克", "超重型坦克", "特斯拉坦克", "震荡坦克"
     }
 }
 
@@ -125,6 +140,7 @@ class AttackState:
     DEFENSE = "defense"
     RETREAT = "retreat"
 
+# ================= 指挥类 =================
 class GroupCommander:
     def __init__(self, api: GameAPI, group_id: int):
         self.api = api
@@ -133,182 +149,256 @@ class GroupCommander:
         self.retreat_location: Optional[Location] = None
         self.active: bool = True
 
-    # ---------------- 基础查询 ----------------
-    def get_group_actors(self) -> List[Actor]:
-        query = TargetsQueryParam(group_id=[self.group_id], faction="己方")
-        return self.api.query_actor(query)
-
-    def get_all_visible_enemies_once(self) -> List[Actor]:
-        query = TargetsQueryParam(faction="敌方", restrain=[{"visible": True}])
-        return self.api.query_actor(query)
-
-    def get_own_base_position(self) -> Optional[Location]:
-        bases = self.api.query_actor(TargetsQueryParam(type=["建造厂"], faction="己方"))
-        return bases[0].position if bases else None
-
     # ---------------- 工具方法 ----------------
     @staticmethod
-    def distance(a: Location, b: Location) -> float:
-        dx, dy = a.x - b.x, a.y - b.y
-        return (dx*dx + dy*dy) ** 0.5
+    def dist2(a: Location, b: Location) -> float:
+        dx = a.x - b.x
+        dy = a.y - b.y
+        return dx * dx + dy * dy
 
     @staticmethod
     def center_of(actors: List[Actor]) -> Optional[Location]:
-        if not actors: return None
-        sx = sum(a.position.x for a in actors)
-        sy = sum(a.position.y for a in actors)
-        return Location(x=sx/len(actors), y=sy/len(actors))
+        if not actors:
+            return None
+        n = len(actors)
+        return Location(
+            x=sum(a.position.x for a in actors) / n,
+            y=sum(a.position.y for a in actors) / n
+        )
 
-    def filter_nearby(self, actors: List[Actor], group_center: Location) -> List[Actor]:
-        return [e for e in actors if self.distance(e.position, group_center) <= SIGHT_RANGE]
+    def get_group_actors(self) -> List[Actor]:
+        # 按你最初的写法：使用“己方”+ group_id 查询
+        return self.api.query_actor(TargetsQueryParam(group_id=[self.group_id], faction="己方"))
 
-    def has_air(self, group_actors: List[Actor]) -> bool:
-        return any(a.type in AIR for a in group_actors)
+    def get_visible_enemies(self) -> List[Actor]:
+        return self.api.query_actor(TargetsQueryParam(faction="敌方", restrain=[{"visible": True}]))
 
-    def sort_enemies_by_counter(self, enemies: List[Actor], my_actors: List[Actor]) -> List[Actor]:
-        """根据克制关系给敌方排序：克制我方的威胁高，反之威胁低。"""
-        def score(enemy: Actor) -> int:
-            s = 0
-            for me in my_actors:
-                if enemy.type in COUNTERED_BY.get(me.type, []):
-                    s += 1
-                if me.type in COUNTERED_BY.get(enemy.type, []):
-                    s -= 1
-            return s
-        return sorted(enemies, key=score, reverse=True)
+    def get_base_position(self) -> Optional[Location]:
+        # 优先找“建造厂”，否则取我方任意建筑中心
+        bases = self.api.query_actor(TargetsQueryParam(type=["建造厂"], faction="己方"))
+        if bases:
+            return bases[0].position
 
-    def get_priority_level(self, enemy: Actor, has_air: bool) -> int:
-        """敌人优先级：塔 → 战斗单位 → 非战斗单位 → 建筑"""
-        if enemy.type in ("火焰塔", "特斯拉塔"):
-            return 1
-        if has_air and enemy.type == "防空导弹":
-            return 1
-        if enemy.type in INFANTRIES or enemy.type in VEHICLE or enemy.type in AIR:
-            return 2
-        if enemy.type in NON_COMBAT_TYPES:
-            return 3
-        if enemy.type in BUILDING:
-            return 4 if not (has_air and enemy.type == "防空导弹") else 1
-        return 4
+        my_buildings = self.api.query_actor(TargetsQueryParam(type=list(BUILDING), faction="己方"))
+        if my_buildings:
+            return self.center_of(my_buildings)
+        return None
 
-    def prioritize_targets(self, enemies: List[Actor], group_actors: List[Actor], attack_buildings: bool = True) -> List[Actor]:
-        has_air = self.has_air(group_actors)
-        level_map = {1: [], 2: [], 3: [], 4: []}
+    def filter_nearby(self, actors: List[Actor], center: Location) -> List[Actor]:
+        if not actors:
+            return []
+        sr2 = SIGHT_RANGE * SIGHT_RANGE
+        d2 = self.dist2
+        return [a for a in actors if d2(a.position, center) <= sr2]
+
+    def has_air(self, actors: List[Actor]) -> bool:
+        return any(a.type in AIR for a in actors)
+
+    # ---------------- 优先级计算（防御模式） ----------------
+    def _categorize_enemies_defense(self, enemies: List[Actor], my_has_air: bool) -> Tuple[List[Actor], List[Actor], List[Actor], List[Actor]]:
+        """返回 (towers, combats, non_combat, buildings) 四类，分类只做一次"""
+        towers, combats, non_combat, buildings = [], [], [], []
         for e in enemies:
-            lvl = self.get_priority_level(e, has_air)
-            if lvl == 4 and not attack_buildings:
-                continue
-            level_map[lvl].append(e)
+            et = e.type
+            if et in {"火焰塔", "特斯拉塔"}:
+                towers.append(e)
+            elif et == "防空导弹":
+                if my_has_air:
+                    towers.append(e)
+                else:
+                    buildings.append(e)
+            elif et in NON_COMBAT_TYPES:
+                non_combat.append(e)
+            elif et in COMBAT_UNITS:
+                combats.append(e)
+            elif et in BUILDING:
+                buildings.append(e)
+            else:
+                # 未知类型：保守按作战单位处理（更安全）
+                combats.append(e)
+        return towers, combats, non_combat, buildings
 
-        level_map[2] = self.sort_enemies_by_counter(level_map[2], group_actors)
-        return level_map[1] + level_map[2] + level_map[3] + level_map[4]
+    def _score_pair_defense(self, me: Actor, enemy: Actor, prio: int) -> float:
+        """给定我方actor与目标，根据优先级返回综合分。距离只在 prio 1/2 生效。"""
+        # 基础分
+        if prio == 1:
+            base = 120
+        elif prio == 2:
+            base = 80
+        elif prio == 3:
+            base = 40
+        else:
+            base = 10
 
-    # ---------------- 新增：单位分配目标 ----------------
-    def assign_targets(self, my_actors: List[Actor], enemies: List[Actor]) -> List[tuple]:
-        prioritized_enemies = self.prioritize_targets(enemies, my_actors)
-        assignments = []
-        remaining_enemies = prioritized_enemies[:]  # Use prioritized list for fallback
+        # 克制关系
+        ctr = 0
+        myt = me.type
+        et = enemy.type
+        if et in COUNTERED_BY.get(myt, ()):
+            ctr += 20
+        if myt in COUNTERED_BY.get(et, ()):
+            ctr -= 10
+
+        # 距离分（只对 1/2）
+        if prio == 2:
+            d2 = self.dist2(me.position, enemy.position)
+            return base + ctr - d2 * DIST_COEF
+        return base + ctr
+
+    def assign_targets_defense(self, my_actors: List[Actor], enemies: List[Actor]) -> List[Tuple[Actor, Actor]]:
+        """
+        防御模式的目标分配：
+        1. 防御塔（+ 若有空军则包含防空导弹）
+        2. 敌方作战单位
+        3. 敌方非战斗单位
+        4. 建筑（含无空军时的防空导弹）
+        """
+        if not my_actors or not enemies:
+            return []
+
+        assignments: List[Tuple[Actor, Actor]] = []
+        tower_assigned = defaultdict(int)
+        my_has_air = self.has_air(my_actors)
+
+        # 敌人一次性分类
+        towers, combats, non_combat, buildings = self._categorize_enemies_defense(enemies, my_has_air)
+        priority_groups = ((1, towers), (2, combats), (3, non_combat), (4, buildings))
+
+        # 提前取局部引用，减少属性查找成本
+        score_pair = self._score_pair_defense
+        max_tower = MAX_TOWER_ASSIGNMENTS
+        tower_names = DEFENSE_TOWERS
+
         for me in my_actors:
-            best_target = None
-            # First, look for a target that this unit counters (me counters enemy)
-            for enemy in remaining_enemies:
-                if me.type in COUNTERED_BY.get(enemy.type, []):
-                    best_target = enemy
-                    break
-            # If no countered target found, fallback to the highest priority remaining
-            if not best_target and remaining_enemies:
-                best_target = remaining_enemies[0]
-            if best_target:
-                assignments.append((me, best_target))
-                # Remove to avoid over-assignment, but allow multiples if needed later
-                remaining_enemies.remove(best_target)
+            best_enemy = None
+            best_score = float("-inf")
+
+            for prio, group in priority_groups:
+                if not group:
+                    continue
+                # 遍历该优先级下的候选
+                for enemy in group:
+                    et = enemy.type
+                    if et in tower_names:
+                        # 每座塔同时分配上限
+                        if tower_assigned[enemy.actor_id] >= max_tower:
+                            continue
+                    s = score_pair(me, enemy, prio)
+                    if s > best_score:
+                        best_score = s
+                        best_enemy = enemy
+
+                # 如果在当前优先级已经找到“明显更优”的目标，可直接跳过更低优先级
+                # 这里不做阈值剪枝，保持稳定性（避免来回跳）
+            if best_enemy:
+                assignments.append((me, best_enemy))
+                if best_enemy.type in tower_names:
+                    tower_assigned[best_enemy.actor_id] += 1
+
         return assignments
 
-    # ---------------- 攻击核心 ----------------
-    def attack_target_until_done(self, targets: List[Actor], my_actors: List[Actor], group_center: Location) -> str:
+    # ---------------- 执行方法 ----------------
+    def attack_target_until_done(self, targets: List[Actor], assigner) -> str:
+        """
+        循环在限定时间内持续分配并下达 attack 命令。
+        targets 列表会就地剔除已死亡/超出范围的目标。
+        """
         t0 = time.monotonic()
+        update_actor = self.api.update_actor
+        attack_target = self.api.attack_target
+        dist2 = self.dist2
+        sr2 = SIGHT_RANGE * SIGHT_RANGE
+
         while time.monotonic() - t0 < MAX_TARGET_SECONDS:
-            my = self.get_group_actors()
-            if not my:
+            # 刷新我方
+            my_now = self.get_group_actors()
+            if not my_now:
                 self.active = False
                 return "no_me"
 
-            for t in targets[:]:
-                if not self.api.update_actor(t) or getattr(t, "hppercent", 0) <= 0:
-                    targets.remove(t)
-
+            # 清理目标：死亡或不可更新剔除
+            targets[:] = [t for t in targets if update_actor(t) and getattr(t, "hppercent", 0) > 0]
             if not targets:
                 return "ok"
 
-            my_center = self.center_of(my)
-            if not my_center:
-                self.active = False
-                return "no_me"
-            if all(self.distance(t.position, my_center) > SIGHT_RANGE for t in targets):
+            # 视野检查：若所有目标都超出范围，结束本轮
+            my_center = self.center_of(my_now)
+            if (not my_center) or all(dist2(t.position, my_center) > sr2 for t in targets):
                 return "ok"
 
-            assignments = self.assign_targets(my, targets)
-            for attacker, target in assignments:
-                self.api.attack_target(attacker=attacker, target=target)
+            # 分配与下达攻击
+            for attacker, target in assigner(my_now, targets):
+                attack_target(attacker=attacker, target=target)
 
             time.sleep(ATTACK_TICK)
 
         return "timeout"
 
-    # ---------------- 行为逻辑 ----------------
-    def execute_attack(self):
+    # ========== 状态逻辑 ==========
+    def execute_defense(self):
+        """防御模式：持续在视野内清理‘非建筑’为主（塔/战斗/非战斗），建筑最低优先。"""
+        self.active = True
         while self.active:
             my_actors = self.get_group_actors()
             if not my_actors:
                 self.active = False
                 break
+
             my_center = self.center_of(my_actors)
             if not my_center:
                 self.active = False
                 break
 
-            enemies = self.get_all_visible_enemies_once()
+            enemies = self.get_visible_enemies()
+            nearby = self.filter_nearby(enemies, my_center)
+            if not nearby:
+                # 视野内无敌方，结束本轮
+                self.active = False
+                break
+
+            # 只用“防御分配器”
+            self.attack_target_until_done(nearby, assigner=self.assign_targets_defense)
+            time.sleep(ATTACK_TICK)
+
+    def execute_attack(self):
+        """进攻模式（可按需要扩展你自己的进攻优先级）"""
+        self.active = True
+        while self.active:
+            my_actors = self.get_group_actors()
+            if not my_actors:
+                self.active = False
+                break
+
+            my_center = self.center_of(my_actors)
+            if not my_center:
+                self.active = False
+                break
+
+            enemies = self.get_visible_enemies()
             nearby = self.filter_nearby(enemies, my_center)
             if not nearby:
                 self.active = False
                 break
 
-            targets = self.prioritize_targets(nearby, my_actors, attack_buildings=True)
-            self.attack_target_until_done(targets, my_actors, my_center)
-            time.sleep(ATTACK_TICK)
-
-    def execute_defense(self):
-        while self.active:
-            my_actors = self.get_group_actors()
-            if not my_actors:
-                self.active = False
-                break
-            my_center = self.center_of(my_actors)
-            if not my_center:
-                self.active = False
-                break
-
-            enemies = self.get_all_visible_enemies_once()
-            nearby = self.filter_nearby(enemies, my_center)
-            nearby_combat = [e for e in nearby if e.type not in BUILDING]
-            if not nearby_combat:
-                self.active = False
-                break
-
-            targets = self.prioritize_targets(nearby_combat, my_actors, attack_buildings=False)
-            self.attack_target_until_done(targets, my_actors, my_center)
+            # 进攻这里也可直接复用防御分配（简单可靠），或替换为你的进攻策略
+            self.attack_target_until_done(nearby, assigner=self.assign_targets_defense)
             time.sleep(ATTACK_TICK)
 
     def execute_retreat(self):
+        """撤退：若提供 retreat_location 则优先使用；否则自动回基地（建造厂或我方建筑中心）"""
         my_actors = self.get_group_actors()
         if not my_actors:
             self.active = False
             return
-        location = self.retreat_location or self.get_own_base_position()
-        if not location:
+
+        # 目标位置：用户给的 > 基地 > 直接返回
+        dest = self.retreat_location or self.get_base_position()
+        if not dest:
             self.active = False
             return
-        self.api.move_units_by_location(my_actors, location, attack_move=False)
+
+        # 非攻击性移动
+        self.api.move_units_by_location(my_actors, dest, attack_move=False)
         self.active = False
 
     # ---------------- 主入口 ----------------
@@ -320,7 +410,7 @@ class GroupCommander:
 
     def run(self):
         if not self.active:
-            return
+            self.active = True  # 允许外部先设state后直接run
         if self.current_state == AttackState.ATTACK:
             self.execute_attack()
         elif self.current_state == AttackState.DEFENSE:
