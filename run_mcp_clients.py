@@ -1,17 +1,18 @@
 from azure_speech.stt import speech_to_text_once
 import asyncio
 import configs
-from openai_mcp.agent.group_commander_agent import group_commander_tool
-from openai_mcp.mcp_client import create_executor_async, agent_chat_async
+from llm_core.tools.function_tools.squad_commander_tool import squad_commander_tool
+from llm_core.mcp_client import create_executor_async, agent_chat_async
 import argparse
-from openai_mcp.agent.agent_factory import AgentFactory
+from llm_core.agent.agent_factory import AgentFactory
 from concurrent.futures import ThreadPoolExecutor
 import sched
 import time
 from threading import Thread
-from openai_mcp.runtime_game_state import GROUP_COMMANDER_MONITOR, schedule_monitor
+from llm_core.runtime_game_state import GROUP_COMMANDER_MONITOR, schedule_monitor
+import logging
 
-
+logger = logging.getLogger("AgentSystem")
 executor = ThreadPoolExecutor(max_workers=1)
 
 
@@ -40,12 +41,12 @@ def run_scheduler_monitoring():
     # 启动调度器线程
     sched_thread = Thread(target=scheduler.run, daemon=True)
     sched_thread.start()
-    print("[INFO] 地图监控已启动")
+    logger.info("[INFO] 地图监控已启动")
 
 
 def run_group_commander_monitor():
     GROUP_COMMANDER_MONITOR.start()
-    print("[INFO] 组指挥监控已启动")
+    logger.info("[INFO] 组指挥监控已启动")
 
 
 async def main(enable_speech:bool = True):
@@ -55,16 +56,16 @@ async def main(enable_speech:bool = True):
     async with create_executor_async(mcp_server_params=configs.MCP_CONFIGS.MCP_SERVER_PARAMS_LIST) as mcp_servers:
         # 代理实例
         # war_executor = AgentFactory.create_attack_retreat_agent(mcp_servers=mcp_servers)
-        general_executor = AgentFactory.create_executor_agent(mcp_servers=mcp_servers, tools=[group_commander_tool])
+        general_executor = AgentFactory.create_executor_agent(mcp_servers=mcp_servers, tools=[squad_commander_tool])
         while True:
             user_input = None
             if enable_speech:
-                print("[INFO] 请开始说话...")
+                logger.info("[INFO] 请开始说话...")
                 user_input = await get_speech_input_async()
             else:
-                print("[INFO] 请输入指令...")
+                logger.info("[INFO] 请输入指令...")
                 user_input = input(">>> ")
-            print(f"[USER MISSION]: {user_input}")
+            logger.info(f"[USER MISSION]: {user_input}")
             if user_input and "退出游戏" in user_input:
                 break
 

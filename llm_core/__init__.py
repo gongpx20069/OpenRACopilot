@@ -1,4 +1,6 @@
 from OpenRA_Copilot_Library.game_api import GameAPI
+import logging
+from rich.logging import RichHandler
 
 # init game api
 game_api = GameAPI(host="localhost", port=7445, language="zh")
@@ -32,3 +34,14 @@ UNIT_DEPENDENCIES = {
     "V2火箭发射车": ["战车工厂", "雷达"],
     "超重型坦克": ["战车工厂", "维修厂", "科技中心"]
 }
+
+
+# ===== 配置 logging =====
+logging.basicConfig(
+    level="INFO",  # 默认 INFO，可改 DEBUG
+    format="%(message)s",
+    datefmt="[%H:%M:%S]",
+    handlers=[RichHandler(markup=True, rich_tracebacks=True)]
+)
+
+logger = logging.getLogger("AgentSystem")

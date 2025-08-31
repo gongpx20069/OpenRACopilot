@@ -1,11 +1,14 @@
 import threading
 import time
 from typing import Dict, List, Optional
-
-# 你已有的依赖
 from OpenRA_Copilot_Library import Actor, Location
 from OpenRA_Copilot_Library.game_api import GameAPI
-from ..expert.group_commander import GroupCommander, AttackState  # 按你项目里的路径
+from ..expert.group_commander_expert import GroupCommander, AttackState  # 按你项目里的路径
+import logging
+
+
+logger = logging.getLogger("AgentSystem")
+
 
 # =================== CommanderWorker ===================
 class CommanderWorker(threading.Thread):
@@ -20,10 +23,14 @@ class CommanderWorker(threading.Thread):
         self._snapshot_lock = threading.RLock()
         self._participants_snapshot: List[Actor] = []
         self._last_snapshot_ts: float = 0.0
+        self.commander_state = commander.current_state
 
     def run(self):
         try:
             while not self._stop_flag.is_set() and self.commander.active:
+                if self.commander_state != self.commander.current_state:
+                    logger.info(f"[bold red]小队 {self.commander.group_id} 的战斗状态变化【{self.commander_state} -> {self.commander.current_state}】[/]")
+                    self.commander_state = self.commander.current_state
                 self.commander.run()
 
                 # 刷新参战我方快照
@@ -108,7 +115,7 @@ class GroupMonitor(threading.Thread):
             worker.join(timeout=1.0)
 
     # ---------- 管理 GroupCommander ----------
-    def start_group(self, group_id: int, state: str, retreat_location: Optional[Location] = None) -> bool:
+    def start_group(self, group_id: int, state: str, scout_on_enemy_strategy: str = AttackState.DEFENSE, retreat_location: Optional[Location] = None, scout_location: Optional[Location] = None) -> bool:
         """
         启动一个 group 的战斗线程
         返回 False 表示该 group_id 已存在且仍在运行
@@ -118,13 +125,22 @@ class GroupMonitor(threading.Thread):
                 return False
 
             commander = GroupCommander(self.api, group_id)
-            commander.set_state(state, retreat_location=retreat_location)
-
+            commander.set_state(state, retreat_location=retreat_location, scout_on_enemy_strategy=scout_on_enemy_strategy, scout_location=scout_location)
             worker = CommanderWorker(commander, tick=self.tick)
             self._commanders[group_id] = commander
             self._workers[group_id] = worker
             worker.start()
             return True
+        
+    def change_group_state(self, group_id: int, state: str, retreat_location: Optional[Location] = None) -> None:
+        with self._lock:
+            cmd = self._commanders.get(group_id)
+            if cmd:
+                cmd.set_state(state, retreat_location=retreat_location)
+                return True
+            else:
+                return False
+
 
     def stop_group(self, group_id: int) -> None:
         with self._lock:
@@ -192,8 +208,8 @@ if __name__ == "__main__":
     try:
         while True:
             for gid in monitor.list_groups():
-                print(f"Group {gid}: running={monitor.is_group_running(gid)}, fighting={monitor.is_group_fighting(gid)}, participants={len(monitor.get_participants(gid))}")
+                logger.info(f"Group {gid}: running={monitor.is_group_running(gid)}, fighting={monitor.is_group_fighting(gid)}, participants={len(monitor.get_participants(gid))}")
             time.sleep(1.0)
     except KeyboardInterrupt:
-        print("Stopping monitor...")
+        logger.info("Stopping monitor...")
         monitor.stop()

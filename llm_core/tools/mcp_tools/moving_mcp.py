@@ -3,8 +3,8 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import  Field
 from OpenRA_Copilot_Library.game_api import GameAPIError
 from OpenRA_Copilot_Library.models import Actor, Location, TargetsQueryParam
-from . import BUILDING, VEHICLE, INFANTRIES, AIR, game_api
-from .utils import validate_actor_ids, print_tool_io, tool_sleep
+from ... import BUILDING, VEHICLE, INFANTRIES, AIR, game_api
+from ..utils import validate_actor_ids, print_tool_io, tool_sleep
 import traceback
 
 
@@ -35,36 +35,36 @@ def move_units_by_location(
         return "[ERROR] 移动出现问题，请确定ActorList中的ID是有效的己方有效（载具，士兵，空军，海军）ID。"
 
 
-@actor_mcp.tool(name="form_group", description="将单位（载具，士兵，空军，海军）编成具体的组。")
+@actor_mcp.tool(name="form_group", description="将单位（载具，士兵，空军，海军）编成具体的小队。")
 @print_tool_io
 def form_group(
     actor_ids: List[int] = Field(..., description="计划组织的单位ID列表"),
-    group_id: int = Field(..., description="计划编队后的ID")
+    group_id: int = Field(..., description="计划组织的小队ID")
 ):
     try:
         validated_actors = validate_actor_ids(actor_ids)
         game_api.form_group(validated_actors, group_id)
-        return f"[SUCCESS] 正在将Actor [{validated_actors}] 组织成组{group_id}"
+        return f"[SUCCESS] 正在将Actor [{validated_actors}] 组织成小队{group_id}"
     except:
         return "[ERROR] 无法编队，请确定ActorList中的ID是有效的己方有效（载具，士兵，空军，海军）ID。"
     
 
-@actor_mcp.tool(name="query_group", description="查询某个具体的编队有哪些具体单位（载具，士兵，空军，海军）。")
+@actor_mcp.tool(name="query_group", description="查询某个小队中包含的Actor id列表。")
 @print_tool_io
 def query_group(
-    group_id: int = Field(..., description="想要查询的我方军事单位编组ID")
+    group_id: int = Field(..., description="想要查询的我方军事单位小队ID")
 ):
     try:
-        result = f"# 编组{group_id}\n"
+        result = f"# 小队{group_id}的所有成员\n"
         group = game_api.query_actor(query_params=TargetsQueryParam(group_id=[group_id]))
         for actor in group:
             result += f"- ID：{actor.actor_id}，类型：{actor.type}，位置：{actor.position}，HP：{actor.hppercent}%\n"
-        result += f"...编组{group_id}共{len(group)}个单位。\n"
+        result += f"...小队{group_id}共{len(group)}个单位。\n"
         return result
     except Exception as ex:
-        print(ex)
+        logger.info(ex)
         traceback.print_exc()
-        return f"[ERROR] 无法查询编组，请确定编组ID是有效的"
+        return f"[ERROR] 无法查询小队，请确定小队ID是有效的"
     
 
 @actor_mcp.tool(name="stop_move", description="停止单位（载具，士兵，空军，海军）的移动。")
