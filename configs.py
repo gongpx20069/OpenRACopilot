@@ -7,7 +7,7 @@ class AOAI_CONFIGS:
 
 # Azure Speech
 class AZURE_SPEECH_CONFIGS:
-    AZURE_SPEECH_KEY = "DYDQDqUcftTyiSWoJ6afFg0Jkc4h4L15VQdnlywVNPauwVAktPZ5JQQJ99BBACYeBjFXJ3w3AAAYACOGfZfJ"
+    AZURE_SPEECH_KEY = "xxxxx"
     AZURE_SPEECH_REGION = "eastus"
     AZURE_SPEECH_ENDPOINT = "https://eastus.api.cognitive.microsoft.com/"
 
