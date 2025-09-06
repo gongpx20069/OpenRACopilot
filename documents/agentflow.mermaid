@@ -1,0 +1,55 @@
+graph TD
+    A[Task Classifier Agent] -->|Handoffs| B[Building Agent]
+    A -->|Handoffs| C[Squad Formation Agent]
+    A -->|Handoffs| D[Squad Commander Agent]
+    A -->|Handoffs| E[Default Executor Agent]
+    D -->|Handoffs| C
+    T11 -->|Activate| F[Squad Command Expert]
+    T17 -->|Activate| F[Squad Command Expert]
+
+    subgraph Building Agent Tools
+        B --> T1[build_unit]
+        B --> T2[place_building]
+        B --> T3[produce_units]
+        B --> T4[deploy_mcv]
+        B --> T5[manage_production]
+        B --> T6[repair_units]
+        B --> T7[query_game_state]
+    end
+
+    subgraph Squad Formation Agent Tools
+        C --> T8[form_group]
+        C --> T9[query_group]
+        C --> T10[query_game_state]
+    end
+
+    subgraph Squad Commander Agent Tools
+        D --> T11[squad_commander_tool]
+        D --> T12[attack_target]
+        D --> T13[move_squad_by_location]
+        D --> T14[stop_move_squad]
+        D --> T15[query_group]
+        D --> T16[squad_attack_enemy_actor]
+        D --> T17[explore_map]
+        D --> T18[query_game_state]
+    end
+
+    subgraph Default Executor Agent Tools
+        E --> T19[build_unit]
+        E --> T20[place_building]
+        E --> T21[produce_units]
+        E --> T22[deploy_mcv]
+        E --> T23[manage_production]
+        E --> T24[repair_units]
+        E --> T25[query_game_state]
+        E --> T26[move_units_by_location]
+        E --> T27[form_group]
+        E --> T28[query_group]
+        E --> T29[stop_move]
+        E --> T30[attack_target]
+    end
+
+    subgraph Squad Command Expert Tools
+        F --> T31["squad_commander_tool\n(Attack, Defense, Retreat)"]
+        F --> T32["explore_map\n(Explore)"]
+    end

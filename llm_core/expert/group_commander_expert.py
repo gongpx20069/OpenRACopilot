@@ -9,7 +9,7 @@ from .. import BUILDING, VEHICLE, INFANTRIES, AIR
 SIGHT_RANGE = 10
 ATTACK_TICK = 0.6
 MAX_TARGET_SECONDS = 1.5
-# MAX_TOWER_ASSIGNMENTS = 10
+MAX_TOWER_ASSIGNMENTS = 10
 DIST_COEF = 0.15  # 距离分数系数（平方距离）
 
 # 在你的常量区新增一条：明显的非战斗/工具单位（不会主动造成伤害）
@@ -220,6 +220,12 @@ class GroupCommander:
     def filter_nearby(self, actors: List[Actor], center: List[Location]) -> List[Actor]:
         if not actors:
             return []
+
+        if (self.current_state == AttackState.DEFENSE) or (self.current_state == AttackState.SCOUT and self.scout_on_enemy_strategy == AttackState.DEFENSE):
+            for actor in actors:
+                if actor.type in BUILDING and actor.type not in DEFENSE_TOWERS:
+                    actors.remove(actor)
+        
         sr2 = SIGHT_RANGE * SIGHT_RANGE
         d2 = self.dist2
         return [a for a in actors if any(d2(a.position, c) <= sr2 for c in center)]
@@ -282,8 +288,9 @@ class GroupCommander:
         """
         防御模式目标分配（优化版）：
         1. 防御塔（火焰塔/特斯拉塔 + 若有空军则包含防空导弹）
-        - 对塔有克制作用的单位，平均分配到不同塔
-        - 其他单位也尽量均匀分配
+        - 对塔有克制作用的单位，优先分配
+        - 每个塔最多 MAX_TOWER_ASSIGNMENTS 个单位
+        - 考虑克制关系和距离权重
         2. 敌方作战单位
         3. 敌方非战斗单位
         4. 建筑（含无空军时的防空导弹）
@@ -294,51 +301,66 @@ class GroupCommander:
         assignments: List[Tuple[Actor, Actor]] = []
         my_has_air = self.has_air(my_actors)
 
-        # 一次性分类敌人
+        # 分类敌人
         towers, combats, non_combat, buildings = self._categorize_enemies_defense(enemies, my_has_air)
-        priority_groups = ((2, combats), (3, non_combat), (4, buildings))  # 1级塔单独处理
-
-        score_pair = self._score_pair_defense
-
-        # ---------- Step 1: 塔的均匀分配 ----------
+        
+        # Step 1: 防御塔分配
         assigned_ids = set()
         if towers:
             tower_list = list(towers)
-            n_towers = len(tower_list)
+            tower_counts = {t.actor_id: 0 for t in tower_list}
 
-            # 预先缓存：我方单位是否克制塔
             def is_counter_unit(me: Actor) -> bool:
                 return any(t.type in COUNTERED_BY.get(me.type, ()) for t in tower_list)
 
+            # 根据克制关系分组
             counter_units = [me for me in my_actors if is_counter_unit(me)]
             normal_units = [me for me in my_actors if me not in counter_units]
 
-            # 克制单位均分
-            for i, me in enumerate(counter_units):
-                tower = tower_list[i % n_towers]
-                assignments.append((me, tower))
-                assigned_ids.add(me.actor_id)
+            def best_tower_for(me: Actor) -> Optional[Actor]:
+                """选择最优塔（考虑距离+克制+数量上限）"""
+                best, best_score = None, float("-inf")
+                for t in tower_list:
+                    if tower_counts[t.actor_id] >= MAX_TOWER_ASSIGNMENTS:
+                        continue
+                    score = self._score_pair_defense(me, t, prio=1)
+                    if score > best_score:
+                        best, best_score = t, score
+                if best:
+                    tower_counts[best.actor_id] += 1
+                return best
 
-            # 其他单位均分
-            for i, me in enumerate(normal_units):
-                tower = tower_list[i % n_towers]
-                assignments.append((me, tower))
-                assigned_ids.add(me.actor_id)
+            # 先分配克制单位
+            for me in counter_units:
+                tower = best_tower_for(me)
+                if tower:
+                    assignments.append((me, tower))
+                    assigned_ids.add(me.actor_id)
 
-        # ---------- Step 2: 其他优先级目标 ----------
+            # 再分配普通单位
+            for me in normal_units:
+                tower = best_tower_for(me)
+                if tower:
+                    assignments.append((me, tower))
+                    assigned_ids.add(me.actor_id)
+
+        # Step 2: 其他优先级目标
+        priority_groups = ()
+        if self.current_state == AttackState.ATTACK:
+            priority_groups = ((2, combats), (3, non_combat), (4, buildings))
+        elif self.current_state == AttackState.DEFENSE:
+            priority_groups = ((2, combats), (3, non_combat))
+
         for me in my_actors:
             if me.actor_id in assigned_ids:
-                continue  # 已分配过（对塔）
+                continue
 
             best_enemy, best_score = None, float("-inf")
-
             for prio, group in priority_groups:
-                if not group:
-                    continue
                 for enemy in group:
-                    s = score_pair(me, enemy, prio)
-                    if s > best_score:
-                        best_score, best_enemy = s, enemy
+                    score = self._score_pair_defense(me, enemy, prio)
+                    if score > best_score:
+                        best_score, best_enemy = score, enemy
 
             if best_enemy:
                 assignments.append((me, best_enemy))

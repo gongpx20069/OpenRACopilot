@@ -22,8 +22,9 @@ def __compile_keyword_patterns() -> Dict[str, re.Pattern]:
     patterns[AgentCategory.BUILD] = re.compile(build_pattern, re.UNICODE)
 
     # === 编队类（不需要前缀） ===
-    formation_keywords = ["编队", "组队", "将.*编队", "将.*移除", "将.*加入"]
-    formation_pattern = "(" + "|".join(map(re.escape, formation_keywords)) + ")"
+    # 注意：这里包含正则表达式，不需要 re.escape
+    formation_keywords = [r"编队", r"组队", r"将.*编队", r"将.*移除", r"将.*加入", r"将.*移出", r"从队伍.*移除", r"从队伍.*移出"]
+    formation_pattern = "(" + "|".join(formation_keywords) + ")"
     patterns[AgentCategory.FORMATION] = re.compile(formation_pattern, re.UNICODE)
 
 

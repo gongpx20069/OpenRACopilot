@@ -1,7 +1,7 @@
 # Azure OpenAI
 class AOAI_CONFIGS:
-    AOAI_APIKEY = "DItE3gZANC5QzYXL67PHsRikPsRtek4O8RkrClf8SAAbE128mOb7JQQJ99AKACHYHv6XJ3w3AAABACOGEQdN"
-    AOAI_ENDPOINT = "https://gongp-m2yqu7tp-eastus2.openai.azure.com/openai"
+    AOAI_APIKEY = "xxxxxxx"
+    AOAI_ENDPOINT = "https://xxxxxxx.openai.azure.com/openai"
     AOAI_DEPLOYMENT = "gpt-4.1"
     AOAI_API_VERSION = "2025-01-01-preview"
 

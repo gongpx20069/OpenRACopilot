@@ -58,7 +58,7 @@ set_default_openai_client(
         )
     )
 
-async def red_alert_workflow_async(query: str, max_turns: int = configs.AGENTS_CONFIGS.AGENT_REFLECTION_MAX_TURN):
+async def red_alert_workflow_async(query: str, max_turns: int = configs.AGENTS_CONFIGS.AGENT_REFLECTION_MAX_TURN, enable_task_classifier_agent: bool = True):
     """
     Workflow for Red Alert assistant bot using multi-agent handoff.
     - Starts with task classification agent to categorize and handoff the task.
@@ -75,7 +75,8 @@ async def red_alert_workflow_async(query: str, max_turns: int = configs.AGENTS_C
         agent = task_classifier_agent
         while max_turns > 0:
             # Step 0: Try Task Classifier Function
-            agent = task_classifier_function(query, AGENT_MAP)
+            if not enable_task_classifier_agent:
+                agent = task_classifier_function(query, AGENT_MAP) 
 
             # Step 1: Run Task Classification Agent
             executer_response = await Runner.run(agent, mission, max_turns=configs.AGENTS_CONFIGS.SINGAL_AGENT_MAX_TURN)

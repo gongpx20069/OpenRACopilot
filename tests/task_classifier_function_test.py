@@ -31,6 +31,7 @@ def run_tests():
         # 测试 formation_agent
         ("将所有防空车编队为队1", "squad_formation_agent"),
         ("将所有坦克和维修厂编队为队2", "squad_formation_agent"),
+        ("将血量低于50%的单位移出队3", "squad_formation_agent"),
         
         # 测试 other_agent
         ("移动防空车到地图左上角", "default_executer_agent"),
