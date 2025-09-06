@@ -274,6 +274,12 @@ graph TD
     end
 ```
 
+- 🤖 **Task Classifier Agent - 任务分发官**：智能解析用户指令，将任务精准分配给最合适的专业Agent，智能路由，也可切换为传统的关键词识别、任务分类。
+- 🏗️ **Building Agent - 建筑大师**：统筹基地建设和资源发展，智能规划建筑布局，管理生产队列，优化资源利用。
+- 👥 **Squad Formation Agent - 部队编组专家**：智能化军事单位编组和管理，根据单位类型自动创建最优战斗小组，保持队形和战术。
+- ⚔️ **Squad Commander Agent - 战场指挥官**：实时战术指挥和战斗决策，根据情况切换不同的作战模式，确保战斗效率和效果。
+- 🔍 **Default Red Alert Agent - 默认通用复杂任务指挥官**：当其他Agent无法解决当前任务时，或者Task Classifier发现是通用任务时，则hand off给本Agent。可用于解决所有任务，但由于tools编排过多，简单任务也会使用复杂流程（multi-turn）完成。
+
 ## 🤝 贡献指南
 
 **Fork 项目**
