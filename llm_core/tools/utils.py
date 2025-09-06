@@ -1,18 +1,21 @@
 from OpenRA_Copilot_Library.models import TargetsQueryParam
-from . import game_api
+from .. import game_api
 from OpenRA_Copilot_Library.models import Actor
 from typing import Dict, List
 from collections import defaultdict
 from functools import wraps
 import time
+import logging
+
+logger = logging.getLogger("AgentSystem")
 
 
 def print_tool_io(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        print(f"[Tool Log] {func.__name__} - Input: args={args}, kwargs={kwargs}")
+        logger.info(f"[Tool Log] {func.__name__} - Input: args={args}, kwargs={kwargs}")
         result = func(*args, **kwargs)
-        print(f"[Tool Log] {func.__name__} - Output: {result}")
+        # logger.info(f"[Tool Log] {func.__name__} - Output: {result}")
         return result
     return wrapper
 
@@ -22,7 +25,7 @@ def tool_sleep(seconds: float):
         @wraps(func)
         def wrapper(*args, **kwargs):
             result = func(*args, **kwargs)
-            print(f"[Tool Sleep] {func.__name__} - {seconds}s")
+            logger.info(f"[Tool Sleep] {func.__name__} - {seconds}s")
             time.sleep(seconds)
             return result
         return wrapper
@@ -31,7 +34,7 @@ def tool_sleep(seconds: float):
 
 def validate_actor_ids(actor_ids: List[Actor]) -> List[Actor]:
     actors = game_api.query_actor(TargetsQueryParam(faction="自己"))
-    # print("validate_actor_ids result: ", actors)
+    # logger.info("validate_actor_ids result: ", actors)
     our_actor_ids = set([actor.actor_id for actor in actors])
     validated_actors = []
     for actor_id in actor_ids:

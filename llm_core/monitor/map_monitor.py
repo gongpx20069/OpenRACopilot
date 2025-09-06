@@ -2,10 +2,13 @@ from typing import List
 from OpenRA_Copilot_Library.models import Actor, TargetsQueryParam
 from .map import Map
 from collections import defaultdict
-from ..mcp_server import BUILDING, game_api
+from .. import BUILDING, game_api
 import traceback
-import configs
-from multiprocessing import shared_memory
+import logging
+# from multiprocessing import shared_memory
+
+
+logger = logging.getLogger("AgentSystem")
 
 
 class DefenseMonitor:
@@ -40,27 +43,27 @@ class DefenseMonitor:
 
         try:
             llm_map = self.map.to_llm()
-            data_bytes = llm_map.encode('utf-8')
-            if self.shm is None:
-                try:
-                    # Attempt to create new shared memory
-                    self.shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME, create=True, size=4096)
-                except FileExistsError:
-                    # If exists, connect to existing shared memory
-                    self.shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME, create=False)
+            # data_bytes = llm_map.encode('utf-8')
+            # if self.shm is None:
+            #     try:
+            #         # Attempt to create new shared memory
+            #         self.shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME, create=True, size=4096)
+            #     except FileExistsError:
+            #         # If exists, connect to existing shared memory
+            #         self.shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME, create=False)
                 
-            self.shm.buf[:len(data_bytes)] = data_bytes
-            # print(f"[INFO] Update LLM Map success, map size: {len(data_bytes)}")
+            # self.shm.buf[:len(data_bytes)] = data_bytes
+            # logger.info(f"[INFO] Update LLM Map success, map size: {len(data_bytes)}")
 
         except Exception as ex:
-            print(f"[ERROR] Update LLM Map error: {ex}")
+            logger.info(f"[ERROR] Update LLM Map error: {ex}")
             traceback.print_exc()
         
         be_attacked_actors = self.be_attacked(actors)
         if "building" in be_attacked_actors:
-            print("!!!!!!!! warning: building is under attack: ", be_attacked_actors["building"])
+            logger.info("!!!!!!!! warning: building is under attack: ", be_attacked_actors["building"])
         if "infantry" in be_attacked_actors:
-            print("!!!!!!!! warning: infantry is under attack: ", be_attacked_actors["infantry"])
+            logger.info("!!!!!!!! warning: infantry is under attack: ", be_attacked_actors["infantry"])
 
 
     def __del__(self):

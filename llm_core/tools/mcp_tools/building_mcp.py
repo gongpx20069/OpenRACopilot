@@ -3,12 +3,13 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import  Field
 from OpenRA_Copilot_Library.game_api import GameAPIError
 from OpenRA_Copilot_Library.models import TargetsQueryParam
-from .utils import classify_different_faction_actors, convert_byte_to_str, validate_actor_ids, print_tool_io
-from . import BUILDING, VEHICLE, INFANTRIES, AIR, game_api, UNIT_DEPENDENCIES, BUILDING_DEPENDENCIES
+from ..utils import classify_different_faction_actors, convert_byte_to_str, validate_actor_ids, print_tool_io
+from ... import BUILDING, VEHICLE, INFANTRIES, AIR, game_api, UNIT_DEPENDENCIES, BUILDING_DEPENDENCIES
 from collections import defaultdict
 import traceback
-from multiprocessing import shared_memory
-import configs
+# from multiprocessing import shared_memory
+# import configs
+
 
 # shared memory
 shm = None # shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME)
@@ -109,17 +110,6 @@ def repair_units(
         return "[ERROR] 修复出现问题，请确定ActorList中的ID是有效的己方载具或者建筑ID。"
 
 
-# @build_mcp.tool(name="ensure_can_build", description="确保可以建造指定的建筑，如果不能会尝试生产所有前置建筑，并等待生产完成。")
-# def ensure_can_build(
-#     building_name: str = Field(..., description="要建造的建筑中文名称，必须是以下列表中的一个：" + ", ".join(BUILDING)),
-# ) -> str:
-#     if building_name not in BUILDING:
-#         return f"[ERROR] 未知的建筑名称: {building_name}"
-#     if game_api.ensure_can_build_wait(building_name=building_name):
-#         return f"[SUCCESS] 建造{building_name}完成。"
-#     return f"[ERROR] 建造{building_name}失败。"
-
-
 @build_mcp.tool(name="query_game_state", description="查询游戏状态（敌我双方单位信息，已探查的地图信息，玩家基地信息，查询屏幕信息）")
 @print_tool_io
 def query_game_state() -> str:
@@ -172,10 +162,10 @@ def query_game_state() -> str:
         map_info = game_api.map_query()
 
         result += "# 地图信息\n"
-        result += f"- 宽度{map_info.MapWidth}\n"
-        result += f"- 高度{map_info.MapHeight}\n"
+        result += f"- 宽度（x轴最大）：{map_info.MapWidth}\n"
+        result += f"- 高度（y轴最大）：{map_info.MapHeight}\n"
         result += f"- 地形类型{map_info.Terrain[0][0] if map_info.Terrain else '未知'}\n"
-        result += "**NOTE:地图原点(0, 0)表示地图的左上角。**\n"
+        result += "**NOTE:地图原点(0, 0)表示地图的左上角；向右为增加x轴数值，向下为增加y轴数值。**\n"
 
         result += "\n"
 
@@ -190,19 +180,19 @@ def query_game_state() -> str:
         # except:
         #     pass
 
-        try:
-            global shm
-            if shm is None:
-                shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME)
-            llm_map_info = convert_byte_to_str(shm.buf)
-            result += "## 地图轮廓"
-            result += "```\n"
-            result += llm_map_info + "\n"
-            result += "```\n"
-            result += "> NOTE: 该地图是一个微缩预测地图，具有滞后性，其中0表示未知区域，非0表示已探索比例。\n\n"
-        except Exception as ex:
-            print(f"[ERROR] 查询地图信息失败: {ex}")
-            traceback.print_exc()
+        # try:
+        #     global shm
+        #     if shm is None:
+        #         shm = shared_memory.SharedMemory(name=configs.GLOBAL_STATE.SHARED_LLM_MAP_NAME)
+        #     llm_map_info = convert_byte_to_str(shm.buf)
+        #     result += "## 地图轮廓"
+        #     result += "```\n"
+        #     result += llm_map_info + "\n"
+        #     result += "```\n"
+        #     result += "> NOTE: 该地图是一个微缩预测地图，具有滞后性，其中0表示未知区域，非0表示已探索比例。\n\n"
+        # except Exception as ex:
+        #     logger.info(f"[ERROR] 查询地图信息失败: {ex}")
+        #     traceback.print_exc()
 
         # 查询玩家基地信息
         result += "# 玩家基地信息\n"

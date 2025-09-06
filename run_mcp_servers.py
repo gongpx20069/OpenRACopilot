@@ -1,13 +1,13 @@
 import threading
 from mcp.server.fastmcp import FastMCP
-from openai_mcp.mcp_server.building_mcp import build_mcp
-from openai_mcp.mcp_server.moving_mcp import actor_mcp
+from llm_core.tools.mcp_tools.building_mcp import build_mcp
+from llm_core.tools.mcp_tools.moving_mcp import actor_mcp
 
 
 def run_server(mcp_server: FastMCP):
-    print("[INFO] 启动 MCP Server...")
+    logger.info("[INFO] 启动 MCP Server...")
     mcp_server.run(transport="sse")  # 阻塞式
-    print("[INFO] MCP Server 已退出")
+    logger.info("[INFO] MCP Server 已退出")
 
 
 def run_server_in_thread(mcp_server: FastMCP):

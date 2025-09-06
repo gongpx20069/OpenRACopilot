@@ -18,6 +18,10 @@ import configs
 import traceback
 from contextlib import asynccontextmanager
 from .agent.agent_factory import ExecutorFeedback, AttackRetreatFeecback
+import logging
+
+
+logger = logging.getLogger("AgentSystem")
 
 
 # enable_verbose_stdout_logging()
@@ -48,18 +52,18 @@ async def create_executor_async(mcp_server_params: List[dict] = [{"url": "http:/
         for param in mcp_server_params
     ]
 
-    print("Connecting to all MCP servers...")
+    logger.info("Connecting to all MCP servers...")
     for server in mcp_servers:
         await server.connect()
-        print(f"MCP Tools {server.name}: ", await server.list_tools())
-    print("All MCP servers connected.")
+        logger.info(f"MCP Tools {server.name}: ", await server.list_tools())
+    logger.info("All MCP servers connected.")
     try:
         yield mcp_servers # yield 代理实例
     finally:
         # 退出 with 块时，手动断开所有 MCP 服务器连接
-        print("Disconnecting from all MCP servers...")
+        logger.info("Disconnecting from all MCP servers...")
         for server in mcp_servers: await server.cleanup()
-        print("All MCP servers disconnected.")
+        logger.info("All MCP servers disconnected.")
 
 
 async def agent_chat_async(agent: Agent, attack_agent:Agent, query: str, max_turns: int = configs.AGENTS_CONFIGS.AGENT_REFLECTION_MAX_TURN):
@@ -75,31 +79,31 @@ async def agent_chat_async(agent: Agent, attack_agent:Agent, query: str, max_tur
             latest_outline = ItemHelpers.text_message_outputs(executer_response.new_items)
             agent_feedback = executer_response.final_output
             if isinstance(agent_feedback, ExecutorFeedback):
-                print("[RA EXECUTER REASONING]:", latest_outline)
+                logger.info("[RA EXECUTER REASONING]:", latest_outline)
                 if agent_feedback.task_complete.lower() == "completed":
                     break
             elif isinstance(agent_feedback, AttackRetreatFeecback):
-                print("[RA WAR EXECUTER REASONING]:", latest_outline)
+                logger.info("[RA WAR EXECUTER REASONING]:", latest_outline)
                 while agent_feedback.war_status.lower() == "still_in":
                     input_items.append({"content": f"批准，请立刻执行", "role": "user"})
                     executer_response = await Runner.run(attack_agent, mission, max_turns=configs.AGENTS_CONFIGS.SINGAL_AGENT_MAX_TURN)
                     input_items = executer_response.to_input_list()
                     latest_outline = ItemHelpers.text_message_outputs(executer_response.new_items)
                     agent_feedback = executer_response.final_output
-                    print("[RA WAR EXECUTER REASONING]:", latest_outline)
-                print("[RA WAR EXECUTER EXITED]:", agent_feedback.reason)
+                    logger.info("[RA WAR EXECUTER REASONING]:", latest_outline)
+                logger.info("[RA WAR EXECUTER EXITED]:", agent_feedback.reason)
                 break
 
             input_items.append({"content": f"批准，请立刻执行", "role": "user"})
-            print("Re-running with feedback")
+            logger.info("Re-running with feedback")
             max_turns -= 1
 
         return executer_response.final_output
     
     except KeyboardInterrupt:
-        print("[INFO] 用户手动中断")
+        logger.info("[INFO] 用户手动中断")
 
     except Exception as e:
-        print(f"[ERROR] 与助手交互时发生错误: {e}")
+        logger.info(f"[ERROR] 与助手交互时发生错误: {e}")
         traceback.print_exc()
         return None

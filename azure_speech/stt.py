@@ -1,5 +1,9 @@
 import azure.cognitiveservices.speech as speechsdk
 import configs
+import logging
+
+
+logger = logging.getLogger("AgentSystem")
 
 
 def speech_to_text_once():
@@ -11,13 +15,13 @@ def speech_to_text_once():
 
     result = speech_recognizer.recognize_once_async().get()
     if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-        print("[SPEECH] 识别到的文本: {}".format(result.text))
+        logger.info("[SPEECH] 识别到的文本: {}".format(result.text))
         return result.text
     elif result.reason == speechsdk.ResultReason.NoMatch:
-        print("[SPEECH] 未识别到语音")
+        logger.info("[SPEECH] 未识别到语音")
     elif result.reason == speechsdk.ResultReason.Canceled:
         cancellation_details = result.cancellation_details
-        print("[SPEECH] 识别取消: {}".format(cancellation_details.reason))
+        logger.info("[SPEECH] 识别取消: {}".format(cancellation_details.reason))
         if cancellation_details.reason == speechsdk.CancellationReason.Error:
-            print("[SPEECH] 错误详情: {}".format(cancellation_details.error_details))
+            logger.info("[SPEECH] 错误详情: {}".format(cancellation_details.error_details))
     return None
