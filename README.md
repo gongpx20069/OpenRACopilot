@@ -1,6 +1,6 @@
 # Red Alert AI Copilot
 
-一个基于大语言模型的《红色警戒》智能指挥助手，基于OpenAI-Agents框架开发，能够通过自然语言或语音指令控制游戏中的建造、部队编队和战斗指挥。参加第一届[红警hackathon](https://hackathon.mofa.ai/)，工作党实在懒得刷分，止步初赛第十。
+一个基于大语言模型的《红色警戒》智能指挥助手，基于OpenAI-Agents框架开发，能够通过自然语言或语音指令控制游戏中的建造、部队编队和战斗指挥。参加第一届[红警hackathon](https://hackathon.mofa.ai/)，工作党实在懒得刷分，止步初赛第九。
 
 
 ## 🚀 快速开始
